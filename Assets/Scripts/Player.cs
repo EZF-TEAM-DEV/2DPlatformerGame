@@ -3,6 +3,7 @@ using NUnit.Framework;
 using Unity.Android.Gradle.Manifest;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 
 public class Player : MonoBehaviour
 {
@@ -31,6 +32,13 @@ public class Player : MonoBehaviour
     [Header("WallMovement")]
     public float wallSlideSpeed = 2f;
     bool isWallSliding;
+    //wall jump
+    bool isWallJumping;
+    float wallJumpDirection;
+    float wallJumpTime = 0.5f;
+    float wallJumpTimer;
+    public Vector2 wallJumpPower = new Vector2(5f, 10f);
+
     Rigidbody2D rb;
 
     void Awake()
@@ -50,13 +58,12 @@ public class Player : MonoBehaviour
         GroudCheck();
         ProcessGravity();
         ProcessWallSliding();
-        Flip();
-    }
-
-    void FixedUpdate()
-    {
-        rb.linearVelocity = new Vector2(horizontalMove * speed, rb.linearVelocityY);
-        
+        ProcessWallJump();
+        if (!isWallJumping)
+        {
+            rb.linearVelocity = new Vector2(horizontalMove * speed, rb.linearVelocityY);
+            Flip();
+        }
     }
 
     private void ProcessGravity()
@@ -94,7 +101,7 @@ public class Player : MonoBehaviour
 
     public void Jump(InputAction.CallbackContext context)
     {
-        if (jumpRemaining > 0 )
+        if (jumpRemaining > 0)
         {
             if (context.performed)
             {
@@ -107,6 +114,47 @@ public class Player : MonoBehaviour
                 jumpRemaining--;
             }
         }
+
+        //wall jump
+        if (context.performed && wallJumpTimer > 0f)
+        {
+            isWallJumping = true;
+            rb.linearVelocity = new Vector2(wallJumpDirection * wallJumpPower.x, wallJumpPower.y);
+            wallJumpTimer = 0f;
+
+            //Force flip
+            if (transform.localScale.x != wallJumpDirection)
+            {
+                isFaceingRight = !isFaceingRight;
+                Vector3 localScale = transform.localScale;
+                localScale.x *= -1f;
+                transform.localScale = localScale;
+            }
+
+            Invoke(nameof(CancelWallJump),wallJumpTime + 0.1f); // wall jump = 0.5f -> jump again = 0.6f
+        }
+    }
+
+    private void ProcessWallJump()
+    {
+        if (isWallSliding)
+        {
+            isWallJumping = false;
+            wallJumpDirection = -transform.localScale.x; //nếu đang quay phải thì nhảy về bên trái
+            wallJumpTimer = wallJumpTime;
+
+            CancelInvoke(nameof(CancelWallJump));
+        }
+        else if (wallJumpTimer > 0f)
+        {
+            wallJumpTimer -= Time.deltaTime;
+        }
+    }
+
+    private void CancelWallJump()
+    {
+        isWallJumping = false;
+           
     }
 
     private void GroudCheck()
